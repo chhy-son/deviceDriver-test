@@ -1,6 +1,7 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 #include "../Project14/DeviceDriver.cpp"
+#include "../Project14/Application.cpp"
 
 class MockFlashMemoryDevice : public FlashMemoryDevice {
 public:
@@ -10,7 +11,7 @@ public:
 
 class DeviceDriverTestFixture : public testing::Test {
 public:
-    DeviceDriver* device;
+    DeviceDriver* deviceDriver;
     MockFlashMemoryDevice FLASHMEMORY;
     
     const long ADDRESS = 0;
@@ -20,7 +21,7 @@ public:
     const int EMPTY_DATA = 0xFF;
     
     void SetUp() {
-        device = new DeviceDriver(&FLASHMEMORY);
+        deviceDriver = new DeviceDriver(&FLASHMEMORY);
     }
 };
 
@@ -29,7 +30,7 @@ TEST_F(DeviceDriverTestFixture, readSucessTest) {
         .Times(5)
         .WillRepeatedly(testing::Return(READ_DATA));
 
-    EXPECT_EQ(device->read(ADDRESS), READ_DATA);
+    EXPECT_EQ(deviceDriver->read(ADDRESS), READ_DATA);
 }
 
 TEST_F(DeviceDriverTestFixture, readFailTest) {
@@ -38,7 +39,7 @@ TEST_F(DeviceDriverTestFixture, readFailTest) {
         .WillRepeatedly(testing::Return((ANOTHER_READ_DATA)));
 
     try {
-        device->read(ADDRESS);
+        deviceDriver->read(ADDRESS);
         FAIL();
     }
     catch (ReadFailException readFailException) {
@@ -52,7 +53,7 @@ TEST_F(DeviceDriverTestFixture, writeSuccessTest) {
         .WillOnce(testing::Return(EMPTY_DATA));
     EXPECT_CALL(FLASHMEMORY, write).Times(1);
 
-    device->write(ADDRESS, WRITE_DATA);
+    deviceDriver->write(ADDRESS, WRITE_DATA);
 }
 
 TEST_F(DeviceDriverTestFixture, writeFailTest) {
@@ -62,10 +63,30 @@ TEST_F(DeviceDriverTestFixture, writeFailTest) {
     EXPECT_CALL(FLASHMEMORY, write).Times(0);
 
     try {
-        device->write(ADDRESS, WRITE_DATA);
+        deviceDriver->write(ADDRESS, WRITE_DATA);
         FAIL();
     }
     catch (WriteFailException writeFailException) {
         EXPECT_EQ(std::string("Write fail"), std::string(writeFailException.what()));
     }
+}
+
+TEST_F(DeviceDriverTestFixture, Application_readAndPrintTest) {
+    Application app(*deviceDriver);
+
+    EXPECT_CALL(FLASHMEMORY, read)
+        .WillRepeatedly(testing::Return(READ_DATA));
+
+    EXPECT_EQ(std::string(5, READ_DATA), std::string(app.readAndPrint(0, 4)));
+}
+
+TEST_F(DeviceDriverTestFixture, Application_writeAll) {
+    Application app(*deviceDriver);
+
+    EXPECT_CALL(FLASHMEMORY, read)
+        .Times(5)
+        .WillRepeatedly(testing::Return(EMPTY_DATA));
+    EXPECT_CALL(FLASHMEMORY, write).Times(5);
+
+    app.writeAll(WRITE_DATA);
 }
